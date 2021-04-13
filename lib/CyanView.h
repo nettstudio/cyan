@@ -40,6 +40,7 @@
 //#include "cyan_layeritem.h"
 #include "CyanLayerItem.h"
 //#include "CyanRuler.h"
+#include "CyanHistory.h"
 
 #define TILE_Z 6
 #define LAYER_Z 100
@@ -88,6 +89,7 @@ private:
     //CyanRuler *_vRuler;
     bool _showGuides;
     View::InteractiveMode _mode;
+    CyanHistory _history;
 
 signals:
     void zoomChanged();
@@ -145,7 +147,8 @@ public slots:
     QSize getCanvasSize();
     CyanImageFormat::CyanCanvas getCanvasProject();
     void setLayerVisibility(int layer,
-                            bool layerIsVisible);
+                            bool layerIsVisible,
+                            bool addToUndo = false);
     bool getLayerVisibility(int layer);
     void setLayerLock(int layer,
                       bool layerIsLocked);
@@ -218,12 +221,19 @@ public slots:
     void setFilename(const QString &filename);
     const QString getFilename();
 
+    void setUndo(bool state = true);
+    void setRedo();
+
 private slots:
     void handleLayerMoving(QPointF pos,
                            int id,
                            bool forceRender = false);
     void handleLayerMoved(QPointF pos,
+                          QPointF lpos,
                           int id);
+    void handleLayerMovedUndo(QPointF pos,
+                              QPointF lpos,
+                              int id);
     void handleLayerSelected(int id);
     int getParentLayer();
     const QString getParentCanvas();
@@ -249,6 +259,8 @@ private slots:
     void handleZoomChanged();
     void handleGuideMoved();
     void renderLayerText(int id, bool update);
+
+    void addUndo(int id, QSize pos = QSize(0, 0), bool usePos = false);
 
 protected:
     void wheelEvent(QWheelEvent* event);

@@ -46,7 +46,7 @@
 #include "CyanLayerWidget.h"
 
 #include "CyanCommon.h"
-#include "qtcolorpicker.h"
+//#include "qtcolorpicker.h"
 #include "qtwindowlistmenu.h"
 
 #ifdef BATCH
@@ -93,6 +93,9 @@ private:
 
     QAction *aboutCyanAct;
 
+    QAction *undoAct;
+    QAction *redoAct;
+
     QAction *convertRGBAct;
     QAction *convertCMYKAct;
     QAction *convertGRAYAct;
@@ -103,7 +106,6 @@ private:
     QAction *addGuideHAct;
     QAction *showGuidesAct;
 
-    QActionGroup *magickMemoryResourcesGroup;
     QActionGroup *viewModeGroup;
 
     QActionGroup *profileRGBGroup;
@@ -134,7 +136,7 @@ private:
     QToolButton *colorsButton;
 
     CyanLayerWidget *layersWidget;
-    QtColorPicker *colorPicker;
+    //QtColorPicker *colorPicker;
 
     QLabel *currentZoomStatusIcon;
     QLabel *currentZoomStatusLabel;
@@ -299,16 +301,19 @@ private slots:
     void checkTabsOnClose();
     bool hasDirtyProjects();
 
+    void hasImageMagick();
+
     void setActionsDisabled(bool disabled);
     void setProjectSaveDisabled(bool disabled);
+
+    // history
+    void setViewUndo();
+    void setViewRedo();
 
     // guides
     void handleAddGuideHAct(bool triggered);
     void handleAddGuideVAct(bool triggered);
     void handleShowGuidesAct(bool triggered);
-
-    // magick resources
-    void handleMagickMemoryAct(bool triggered);
 
     //
     void handleViewModeAct(bool triggered);

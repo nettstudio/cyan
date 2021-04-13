@@ -102,8 +102,8 @@ void Editor::setupUI()
     mainToolBar->addWidget(interactButton);
     mainToolBar->addWidget(layersButton);
     mainToolBar->addWidget(colorsButton);
-    mainToolBar->addSeparator();
-    mainToolBar->addWidget(colorPicker);
+    //mainToolBar->addSeparator();
+    //mainToolBar->addWidget(colorPicker);
 
     interactButton->addAction(viewMoveAct);
     interactButton->addAction(viewDrawAct);
@@ -120,6 +120,9 @@ void Editor::setupUI()
     fileMenu->addAction(quitAct);
 
     helpMenu->addAction(aboutCyanAct);
+
+    editMenu->addAction(undoAct);
+    editMenu->addAction(redoAct);
     /*helpMenu->addAction(aboutImageMagickAct);
     helpMenu->addAction(aboutLcmsAct);
     helpMenu->addAction(aboutQtAct);
@@ -224,21 +227,7 @@ void Editor::setupUI()
     if (_native) { nativeStyle->setChecked(true); }
     else { appStyle->setChecked(true); }
 
-    // magick memory resources
-    optMenu->addMenu(memoryMenu);
-    for (int i=2;i<33;++i) {
-        QAction *act = new QAction(this);
-        act->setCheckable(true);
-        act->setText(QString("%1 GB").arg(i));
-        act->setToolTip(tr("Amount of RAM that can be used"));
-        act->setData(i);
-        connect(act, SIGNAL(triggered(bool)), this, SLOT(handleMagickMemoryAct(bool)));
-        magickMemoryResourcesGroup->addAction(act);
-    }
-    memoryMenu->addActions(magickMemoryResourcesGroup->actions());
-
     // splitters
-
     mainSplitter->setOrientation(Qt::Horizontal);
     leftSplitter->setOrientation(Qt::Vertical);
     rightSplitter->setOrientation(Qt::Vertical);
@@ -356,9 +345,10 @@ void Editor::setupWidgets(bool native)
     mainStatusBar->addPermanentWidget(currentZoomStatusIcon);
 
     // main color picker
-    colorPicker = new QtColorPicker(this, -1, true, false);
+    /*colorPicker = new QtColorPicker(this, -1, true, false);
     colorPicker->setIconSize(QSize(16, 32));
-    colorPicker->setStandardColors();
+    colorPicker->setStandardColors();*/
+    //colorPicker->hide();
 
     // toolbar
     mainToolBar = new QToolBar(this);
@@ -403,7 +393,6 @@ void Editor::setupWidgets(bool native)
 
 void Editor::setupActions()
 {
-    magickMemoryResourcesGroup = new QActionGroup(this);
     viewModeGroup = new QActionGroup(this);
 
     profileRGBGroup = new QActionGroup(this);
@@ -450,6 +439,13 @@ void Editor::setupActions()
                           .arg(tr("About"))
                           .arg(qApp->applicationName()));
 
+    undoAct = new QAction(this);
+    undoAct->setText(tr("Undo"));
+    //undoAct->setDisabled(true);
+
+    redoAct = new QAction(this);
+    redoAct->setText(tr("Redo"));
+    //redoAct->setDisabled(true);
 
     convertRGBAct = new QAction(this);
     convertRGBAct->setText(tr("Convert to RGB"));
@@ -515,6 +511,9 @@ void Editor::setupConnections()
 
     connect(aboutCyanAct, SIGNAL(triggered()), this, SLOT(aboutCyan()));
 
+    connect(undoAct, SIGNAL(triggered()), this, SLOT(setViewUndo()));
+    connect(redoAct, SIGNAL(triggered()), this, SLOT(setViewRedo()));
+
     connect(convertRGBAct, SIGNAL(triggered()), this, SLOT(handleColorConvertRGB()));
     connect(convertCMYKAct, SIGNAL(triggered()), this, SLOT(handleColorConvertCMYK()));
     connect(convertGRAYAct, SIGNAL(triggered()), this, SLOT(handleColorConvertGRAY()));
@@ -578,7 +577,7 @@ void Editor::setupConnections()
             this,
             SLOT(handleLayerCompChanged(Magick::CompositeOperator,int)));
 
-    connect(colorPicker, SIGNAL(colorChanged(QColor)), this, SLOT(handleColorChanged(QColor)));
+    //connect(colorPicker, SIGNAL(colorChanged(QColor)), this, SLOT(handleColorChanged(QColor)));
     connect(newButton, SIGNAL(clicked(bool)), this, SLOT(newImageDialog()));
 
     connect(addGuideHAct, SIGNAL(triggered(bool)), this, SLOT(handleAddGuideHAct(bool)));
@@ -683,11 +682,13 @@ void Editor::setupShortcuts()
     duplicateLayerAct->setShortcut(QKeySequence(tr("Ctrl+Shift+D")));
     moveUpLayerAct->setShortcut(Qt::Key_PageUp);
     moveDownLayerAct->setShortcut(Qt::Key_PageDown);
+
+    undoAct->setShortcut(QKeySequence(tr("Ctrl+Z")));
+    redoAct->setShortcut(QKeySequence(tr("Ctrl+Shift+Z")));
 }
 
 void Editor::setupOptions()
 {
-
 }
 
 void Editor::handleStyleChange(bool triggered)

@@ -403,8 +403,10 @@ void View::addLayer(Magick::Image image,
 
     connect(layer, SIGNAL(movingItem(QPointF,int)),
             this, SLOT(handleLayerMoving(QPointF,int)));
-    connect(layer, SIGNAL(movedItem(QPointF,int)),
-            this, SLOT(handleLayerMoved(QPointF,int)));
+    connect(layer, SIGNAL(movedItem(QPointF,QPointF,int)),
+            this, SLOT(handleLayerMoved(QPointF,QPointF,int)));
+    connect(layer, SIGNAL(movedItem(QPointF,QPointF,int)),
+            this, SLOT(handleLayerMovedUndo(QPointF,QPointF,int)));
     connect(layer, SIGNAL(selectedItem(int)),
             this, SLOT(handleLayerSelected(int)));
     connect(this, SIGNAL(viewClosed()),
@@ -453,8 +455,10 @@ void View::addLayer(int id,
 
     connect(layer, SIGNAL(movingItem(QPointF,int)),
             this, SLOT(handleLayerMoving(QPointF,int)));
-    connect(layer, SIGNAL(movedItem(QPointF,int)),
-            this, SLOT(handleLayerMoved(QPointF,int)));
+    connect(layer, SIGNAL(movedItem(QPointF,QPointF,int)),
+            this, SLOT(handleLayerMoved(QPointF,QPointF,int)));
+    connect(layer, SIGNAL(movedItem(QPointF,QPointF,int)),
+            this, SLOT(handleLayerMovedUndo(QPointF,QPointF,int)));
     connect(layer, SIGNAL(selectedItem(int)),
             this, SLOT(handleLayerSelected(int)));
     connect(this, SIGNAL(viewClosed()),
@@ -585,10 +589,12 @@ CyanImageFormat::CyanCanvas View::getCanvasProject()
 }
 
 void View::setLayerVisibility(int layer,
-                              bool layerIsVisible)
+                              bool layerIsVisible,
+                              bool addToUndo)
 {
     if (!_canvas.layers.contains(layer)) { return; }
     if (_canvas.layers[layer].visible != layerIsVisible) {
+        if (addToUndo) { addUndo(layer); }
         _canvas.layers[layer].visible = layerIsVisible;
         handleLayerOverTiles(layer);
     }
@@ -1150,6 +1156,55 @@ const QString View::getFilename()
     return _canvas.filename;
 }
 
+void View::setUndo(bool state)
+{
+    int total = 0;
+    if (state) {
+        total = _history.getUndoTotal();
+    } else {
+        total = _history.getRedototal();
+    }
+    if (total < 1) {
+        emit statusMessage(tr("%1: Buffer is empty").arg(state?tr("Undo"):tr("Redo")));
+        return;
+    }
+    CyanHistory::CyanHistoryItem undo = state?_history.getUndo():_history.getRedo();
+    if (!_canvas.layers.contains(undo.layer)) {
+        emit statusMessage(tr("%1: Layer %2 is not valid anymore").arg(state?tr("Undo"):tr("Redo")).arg(undo.layer));
+        return;
+    }
+
+    // position
+    if (_canvas.layers[undo.layer].position != undo.position) {
+        qDebug() << "SET POSITION";
+        _canvas.layers[undo.layer].position = undo.position;
+        for (int i=0;i<_scene->items().size();++i) {
+            LayerItem *item = dynamic_cast<LayerItem*>(_scene->items().at(i));
+            if (!item) { continue; }
+            if (item->getID() != undo.layer) { continue; }
+            item->setPos(undo.position.width(), undo.position.height());
+            handleLayerOverTiles(item);
+            break;
+        }
+    }
+
+    // visibility
+    /*if (_canvas.layers[undo.layer].visible != undo.visibility) {
+        qDebug() << "SET VISIBILITY";
+        setLayerVisibility(undo.layer, undo.visibility, false);
+        emit updatedLayers();
+    }*/
+
+    handleCanvasChanged();
+    if (state) {_history.clearLastUndo(); }
+    else { _history.clearLastRedo(); }
+}
+
+void View::setRedo()
+{
+    setUndo(false);
+}
+
 // TODO
 void View::setCanvasSpecsFromImage(Magick::Image image)
 {
@@ -1274,12 +1329,26 @@ void View::handleLayerMoving(QPointF pos, int id, bool forceRender)
 }
 
 void View::handleLayerMoved(QPointF pos,
+                            QPointF lpos,
                             int id)
 {
+    Q_UNUSED(lpos)
     handleLayerMoving(pos,
                       id,
                       true);
     handleCanvasChanged();
+}
+
+void View::handleLayerMovedUndo(QPointF pos, QPointF lpos, int id)
+{
+    qDebug() << "handleLayerMovedUndo" << id << pos << lpos;
+    QSize npos = QSize(0, 0);
+    bool usePOS = false;
+    if (pos != lpos) {
+        npos = QSize(lpos.x(), lpos.y());
+        usePOS = true;
+    }
+    addUndo(id, npos, usePOS);
 }
 
 void View::handleLayerSelected(int id)
@@ -1616,6 +1685,7 @@ void View::paintCanvasBackground()
 void View::moveSelectedLayer(MoveLayer gravity, int skip)
 {
     qDebug() << "move selected layer" << _selectedLayer << gravity;
+    addUndo(_selectedLayer);
     for (int i=0;i<_scene->items().size();++i) {
         LayerItem *item = dynamic_cast<LayerItem*>(_scene->items().at(i));
         if (!item) { continue; }
@@ -1641,7 +1711,7 @@ void View::moveSelectedLayer(MoveLayer gravity, int skip)
             break;
         }
         item->setPos(pos);
-        handleLayerMoved(pos, _selectedLayer);
+        handleLayerMoved(pos, pos, _selectedLayer);
         handleLayerOverTiles(item);
     }
 
@@ -1673,6 +1743,39 @@ void View::renderLayerText(int id, bool update)
     if (!_canvas.layers.contains(id) || id<0) { return; }
     _canvas.layers[id].image = CyanImageFormat::renderText(_canvas.layers[id]);
     if (update) { handleLayerOverTiles(id); }
+}
+
+void View::addUndo(int id, QSize pos, bool usePos)
+{
+    if (!_canvas.layers.contains(id)) { return; }
+    CyanImageFormat::CyanLayer layer = _canvas.layers[id];
+    CyanHistory::CyanHistoryItem item;
+    item.layer = id;
+    //item.order = layer.order;
+    //item.locked = layer.locked;
+    if (usePos) {
+        // LEGACY
+        item.position = pos;
+        item.undoPOS = pos;
+        item.redoPOS = layer.position;
+        // NEW
+        item.pos.state = QPointF(pos.width(), pos.height());
+        item.pos.undo = item.pos.state;
+        item.pos.redo = QPointF(layer.position.width(), layer.position.height());
+    }
+    else {
+        // LEGACY
+        item.position = layer.position;
+        item.undoPOS = layer.position;
+        item.redoPOS = layer.position;
+        // NEW
+        item.pos.state = QPointF(layer.position.width(), layer.position.height());
+        item.pos.undo = item.pos.state;
+        item.pos.redo = item.pos.state;
+    }
+    //item.opacity = layer.opacity;
+    item.composite = layer.composite;
+    _history.addUndo(item);
 }
 
 void View::setLockLayers(bool lock)

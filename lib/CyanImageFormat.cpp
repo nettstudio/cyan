@@ -29,7 +29,7 @@ CyanImageFormat::CyanImageFormat()
 
 const QString CyanImageFormat::getVersion()
 {
-    return QString(CYAN_IMAGE_FORMAT_VERSION);
+    return QString(CYAN_PROJECT_VERSION);
 }
 
 QMap<Magick::CompositeOperator, QPair<QString, int> > CyanImageFormat::compositeModes()
@@ -517,68 +517,54 @@ QMap<Magick::CompositeOperator, QPair<QString, int> > CyanImageFormat::composite
         result[Magick::CompositeOperator::StereoCompositeOp] = info;
     }
     counter++;
-#if MagickLibVersion > 0x708
     {
         QPair<QString, int> info;
         info.first = QObject::tr("Freeze");
         info.second = counter;
         result[Magick::CompositeOperator::FreezeCompositeOp] = info;
     }
-#endif
     counter++;
-#if MagickLibVersion > 0x708
     {
         QPair<QString, int> info;
         info.first = QObject::tr("Interpolate");
         info.second = counter;
         result[Magick::CompositeOperator::InterpolateCompositeOp] = info;
     }
-#endif
     counter++;
-#if MagickLibVersion > 0x708
     {
         QPair<QString, int> info;
         info.first = QObject::tr("Negate");
         info.second = counter;
         result[Magick::CompositeOperator::NegateCompositeOp] = info;
     }
-#endif
     counter++;
-#if MagickLibVersion > 0x708
     {
         QPair<QString, int> info;
         info.first = QObject::tr("Reflect");
         info.second = counter;
         result[Magick::CompositeOperator::ReflectCompositeOp] = info;
     }
-#endif
     counter++;
-#if MagickLibVersion > 0x708
     {
         QPair<QString, int> info;
         info.first = QObject::tr("Soft Burn");
         info.second = counter;
         result[Magick::CompositeOperator::SoftBurnCompositeOp] = info;
     }
-#endif
     counter++;
-#if MagickLibVersion > 0x708
     {
         QPair<QString, int> info;
         info.first = QObject::tr("Soft Doge");
         info.second = counter;
         result[Magick::CompositeOperator::SoftDodgeCompositeOp] = info;
     }
-#endif
     counter++;
-#if MagickLibVersion > 0x708
     {
         QPair<QString, int> info;
         info.first = QObject::tr("Stamp");
         info.second = counter;
         result[Magick::CompositeOperator::StampCompositeOp] = info;
     }
-#endif
     return result;
 }
 
@@ -666,7 +652,7 @@ bool CyanImageFormat::writeCanvas(CyanImageFormat::CyanCanvas canvas,
 
     // set cyan project version
     try { image.attribute(QString(CYAN_IMAGE_FORMAT).toStdString(),
-                          QString("%1").arg(CYAN_IMAGE_FORMAT_VERSION)
+                          QString("%1").arg(CYAN_PROJECT_VERSION)
                           .toStdString()); }
     catch(Magick::Error &error_ ) { qWarning() << error_.what(); return false; }
     catch(Magick::Warning &warn_ ) { qWarning() << warn_.what(); }
@@ -735,7 +721,7 @@ bool CyanImageFormat::writeCanvas(CyanImageFormat::CyanCanvas canvas,
                                 Magick::MultiplyEvaluateOperator,
                                 0.0);
                 layer.attribute(QString(CYAN_LAYER_TEXT).toStdString(),
-                                QString("%1").arg(CYAN_IMAGE_FORMAT_VERSION)
+                                QString("%1").arg(CYAN_PROJECT_VERSION)
                                 .toStdString());
                 layer.attribute(QString(CYAN_LAYER_TEXT_HTML).toStdString(),
                                 QString("%1").arg(layers.value().html)
@@ -775,7 +761,7 @@ bool CyanImageFormat::writeCanvas(CyanImageFormat::CyanCanvas canvas,
         // set cyan layer version
         try {
             layer.attribute(QString(CYAN_LAYER).toStdString(),
-                            QString("%1").arg(CYAN_IMAGE_FORMAT_VERSION)
+                            QString("%1").arg(CYAN_PROJECT_VERSION)
                             .toStdString());
         }
         catch(Magick::Error &error_ ) { qWarning() << error_.what(); return false; }
@@ -1145,12 +1131,13 @@ Magick::Image CyanImageFormat::renderText(CyanImageFormat::CyanLayer layer)
                                         "align",
                                         QString::number(layer.textAlign).toStdString());
             //}
+            //layer.image.defineValue("pango", "hinting", "full");
             if (layer.textRotate!=0) {
                 layer.image.defineValue("pango",
                                         "rotate",
                                         QString::number(layer.textRotate).toStdString());
             }
-            layer.image.read(QString("PANGO: %1").arg(markup).toStdString());
+            layer.image.read(QString("PANGO: %1").arg(markup).toUtf8().toStdString());
             layer.image.label(layer.label.toStdString());
         }
         catch(Magick::Error &error_) { qWarning() << error_.what(); }
@@ -1255,32 +1242,27 @@ Magick::Image CyanImageFormat::compLayers(Magick::Image canvas,
         Magick::CompositeOperator layerComp = layers[id].composite;
 
         // composite current layer over previous comp
-        /*if (i.value().composite != Magick::OverCompositeOp &&
-                i.value().composite != Magick::DstOutCompositeOp &&
-                i.value().composite != Magick::XorCompositeOp) {
-                try {
-                    Magick::Image clone(comp);
-                    clone.quiet(true);
-                    clone.composite(layer,
-                                    offsetX,
-                                    offsetY,
-                                    i.value().composite);
-                    clone.matte(false);
-                    layer = clone;
-                    offsetX=0;
-                    offsetY=0;
-                    // override layer composite operator
-                    layerComp = Magick::InCompositeOp;
-                }
-                catch(Magick::Error &error_ ) {
-                    //emit errorMessage(error_.what());
-                    qDebug() << error_.what();
-                }
-                catch(Magick::Warning &warn_ ) {
-                    //emit warningMessage(warn_.what());
-                    qDebug() << warn_.what();
-                }
-            }*/
+        /*if (layers[id].composite != Magick::OverCompositeOp &&
+                layers[id].composite != Magick::DstOutCompositeOp &&
+                layers[id].composite != Magick::XorCompositeOp)
+        {
+            try {
+                Magick::Image clone(comp);
+                clone.quiet(true);
+                clone.composite(layer,
+                                offsetX,
+                                offsetY,
+                                layers[id].composite);
+                clone.alpha(false);
+                layer = clone;
+                offsetX=0;
+                offsetY=0;
+                // override layer composite operator
+                layerComp = Magick::InCompositeOp;
+            }
+            catch(Magick::Error &error_ ) { qDebug() << error_.what(); }
+            catch(Magick::Warning &warn_ ) { qDebug() << warn_.what(); }
+        }*/
 
         // TEMP WORKAROUND!
         if (layer.columns()==1 && layer.rows()==1) {

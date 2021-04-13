@@ -84,7 +84,7 @@ public:
 
     static int getMemoryResource();
     static void setMemoryResource(int gib);
-
+    static int getTotalRam(int percent = 75);
     static void setThreadResources(int thread);
 
 
@@ -109,6 +109,7 @@ public:
 
     static const QString colorspaceToString(Magick::ColorspaceType colorspace);
 
+    static const QString supportedImageMagickVersion();
 };
 
 #endif // CYANCOMMON_H

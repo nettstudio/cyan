@@ -19,9 +19,11 @@
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QLabel>
-#include <QPixmap>
-#include <QImage>
 #include <QApplication>
+#include <QPushButton>
+#include <QMessageBox>
+#include <QDesktopServices>
+#include <QUrl>
 
 #include <Magick++.h>
 
@@ -32,7 +34,6 @@ CyanAboutDialog::CyanAboutDialog(QWidget *parent) :
 {
     setWindowTitle(tr("About Cyan"));
     setAttribute(Qt::WA_DeleteOnClose);
-    setMinimumSize(790, 480);
 
     bool hasHdri= QString(MagickCore::GetMagickFeatures()).contains("HDRI");
     size_t magickQ;
@@ -40,114 +41,95 @@ CyanAboutDialog::CyanAboutDialog(QWidget *parent) :
     MagickCore::GetMagickQuantumDepth(&magickQ);
     QString magickInfo = QString(MagickCore::GetMagickVersion(&magickV)).split("Q").takeFirst();
     QString magickDepth = QString("Q%1").arg(magickQ);
-    if (hasHdri) {
-        magickDepth.append("HDRI");
-    }
+    if (hasHdri) { magickDepth.append("HDRI"); }
 
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
 
     QWidget *headerWidget = new QWidget(this);
     headerWidget->setContentsMargins(0,0,0,0);
-    QVBoxLayout *headerLayout = new QVBoxLayout(headerWidget);
+    headerWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    QHBoxLayout *headerLayout = new QHBoxLayout(headerWidget);
     headerLayout->setContentsMargins(0,0,0,0);
-
-    QWidget *headerContainer = new QWidget(this);
-    headerContainer->setContentsMargins(0,0,0,0);
-    QHBoxLayout *headerContainerLayout = new QHBoxLayout(headerContainer);
-    headerContainerLayout->setContentsMargins(0,0,0,0);
-    headerContainerLayout->addWidget(headerWidget);
-
-    QLabel *logoLabel = new QLabel(this);
-    logoLabel->setAlignment(Qt::AlignHCenter);
-    logoLabel->setPixmap(QPixmap::fromImage(QImage(":/icons/hicolor/128x128/apps/Cyan.png")));
-    headerLayout->addWidget(logoLabel);
-
-    QWidget *magickWidget = new QWidget(this);
-    magickWidget->setContentsMargins(0,0,0,0);
-    magickWidget->setMaximumWidth(300);
-    QVBoxLayout *magickLayout = new QVBoxLayout(magickWidget);
-    magickLayout->setContentsMargins(0,0,0,0);
-    QLabel *magickLabel = new QLabel(this);
-    magickLabel->setWordWrap(true);
-    magickLabel->setOpenExternalLinks(true);
-    magickLabel->setText(QString("<p style=\"text-align:left;\"><table>"
-                                 "<tr><td><b>%1</b></td><td>&nbsp;:&nbsp;</td><td<td>%2</td></tr>"
-                                 "<tr><td><b>%3</b></td><td>&nbsp;:&nbsp;</td><td>%4</td></tr>"
-                                 "<tr><td><b>%5</b></td><td>&nbsp;:&nbsp;</td><td>%6</td></tr>"
-                                 "<tr><td><b>%7</b></td><td>&nbsp;:&nbsp;</td><td>%8</td></tr>"
-                                 "<tr><td><b>%9</b></td><td>&nbsp;:&nbsp;</td><td<td>%10</td></tr>"
-                                 "<tr><td><b>%11</b></td><td>&nbsp;:&nbsp;</td><td>%12</td></tr>"
-                                 "<tr><td><b>%13</b></td><td>&nbsp;:&nbsp;</td><td>%14</td></tr>"
-                                 "<tr><td><b>%15</b></td><td>&nbsp;:&nbsp;</td><td>%16</td></tr>"
-                                 "</table></p>"
-                                 "<p style=\"text-align:center;\">"
-                                 "%17 <a href=\"%18\">%19</a> %20<br>%21 %22"
-                                 "<br><br>"
-                                 "%17 <a href=\"http://www.littlecms.com/\">Little CMS %23</a><br>%21 &copy; 2020 Marti Maria Saguer.<br>%24."
-                                 "</p>")
-                         .arg(tr("Area Limit"))
-                         .arg(CyanCommon::humanFileSize(Magick::ResourceLimits::area(),false, true))
-                         .arg(tr("Map Limit"))
-                         .arg(CyanCommon::humanFileSize(Magick::ResourceLimits::map()))
-                         .arg(tr("Memory Limit"))
-                         .arg(CyanCommon::humanFileSize(Magick::ResourceLimits::memory()))
-                         .arg(tr("Width Limit"))
-                         .arg(CyanCommon::humanFileSize(Magick::ResourceLimits::width(), true))
-                         .arg(tr("Height Limit"))
-                         .arg(CyanCommon::humanFileSize(Magick::ResourceLimits::height(), true))
-                         .arg(tr("Thread Limit"))
-                         .arg(Magick::ResourceLimits::thread())
-                         .arg(tr("Features"))
-                         .arg(MagickCore::GetMagickFeatures())
-                         .arg(tr("Delegates"))
-                         .arg(MagickCore::GetMagickDelegates())
-                         .arg(tr("Powered by"))
-                         .arg(MagickCore::GetMagickLicense())
-                         .arg(magickInfo)
-                         .arg(magickDepth)
-                         .arg(tr("Copyright"))
-                         .arg(MagickCore::GetMagickCopyright())
-                         .arg(QString::number(LCMS_VERSION)
-                                                   .insert(1,".")
-                                                   .remove(2,1)
-                                                   .remove(3,1))
-                         .arg(tr("All rights reserved"))
-                         );
-    magickLayout->addWidget(magickLabel);
-    magickLayout->addStretch();
-    headerContainerLayout->addSpacing(20);
-    headerContainerLayout->addWidget(magickWidget);
 
     QLabel *textLabel = new QLabel(this);
     textLabel->setWordWrap(true);
     textLabel->setOpenExternalLinks(true);
+    textLabel->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
 
-    QLabel *footerLabel = new QLabel(this);
-    footerLabel->setWordWrap(true);
-    footerLabel->setOpenExternalLinks(true);
-    footerLabel->setText("<p style=\"text-align:right;\">"
-                         "<a href=\"https://github.com/rodlie/cyan\"><img src=\":/icons/GitHub-Mark-Light-32px.png\"></a>"
-                         "&nbsp;&nbsp;&nbsp;"
-                         "<a href=\"https://qt.io\"><img src=\":/icons/built-with-Qt_Horizontal.png\"></a>"
-                         "&nbsp;&nbsp;&nbsp;"
-                         "<a href=\"https://www.paypal.me/orodlie\"><img src=\":/icons/paypal.png\"></a>"
-                         "</p>");
+    QWidget *footerWidget = new QWidget(this);
+    footerWidget->setContentsMargins(0,0,0,0);
+    footerWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    QHBoxLayout *footerLayout = new QHBoxLayout(footerWidget);
 
-    QString textString = QString("<h3 align=\"center\">%1 %2</h3><h4 align=\"center\" style=\"text-transform: uppercase;\">%3</h4>")
+    QPushButton *ghButton = new QPushButton(this);
+    ghButton->setIcon(QIcon(":/icons/GitHub-Mark-Light-32px.png"));
+    ghButton->setIconSize(QSize(32, 32));
+    ghButton->setFlat(true);
+    ghButton->setContentsMargins(0,0,0,0);
+    ghButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+
+    QPushButton *qtButton = new QPushButton(this);
+    qtButton->setIcon(QIcon(":/icons/built-with-Qt_Horizontal.png"));
+    qtButton->setIconSize(QSize(133, 32));
+    qtButton->setFlat(true);
+    qtButton->setContentsMargins(0,0,0,0);
+    qtButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+
+    QString cyanPatch = CYAN_VERSION_PATCH;
+    if (cyanPatch.toInt() < 1) { cyanPatch = ""; }
+
+    QString textString = QString("<p style=\"text-align:center;\"><img src=\":/icons/hicolor/128x128/apps/Cyan.png\"></p><h2 align=\"center\" style=\"font-weight:normal;\">%1<br><span style=\"font-size:medium;font-weight:bold\">Version %2 Q%3 %4</span><br><span style=\"font-size:medium;font-weight:bold\">%5</span></h2>")
             .arg(qApp->applicationName())
-            .arg(CYAN_VERSION)
-            .arg(tr("Pixel Viewer, Editor and Converter."));
-   textString.append(QString("<p style=\"text-align:justify;font-weight:normal;\">%3 %4</p>"
-                             "<p style=\"text-align:center;/*font-weight:bold;*/\">"
-                             "%1 &copy; 2020 <a href=\"https://github.com/rodlie\">Ole-André Rodlie</a>. %2."
+            .arg(CYAN_VERSION_MAJOR)
+            .arg(CYAN_VERSION_MINOR)
+            .arg(cyanPatch)
+            .arg(CYAN_EDITION);
+   textString.append(QString("<p style=\"text-align:center;font-size:small;\">"
+                             "Cyan is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 2.0 of the License, or (at your option) any later version."
+                             " The copyright holders of Cyan hereby grant permission for non-GPL compatible plug-ins and add-ons to be used and distributed together with Cyan, provided that you also meet the terms and conditions of the licenses of those plug-ins and add-ons."
+                             " Cyan is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
+                             "<br><br>"
+                             "Cyan %1 &copy; <a href=\"https://github.com/rodlie\" style=\"text-decoration:none;\">Ole-André Rodlie</a>. %2.<br>"
+                             "%7 <a href=\"%3\" style=\"text-decoration:none;\">%4</a> %5<br>[ %12 ]<br>%6.<br>"
+                             "<table>"
+                             "<tr><td><b>%8</b></td><td>&nbsp;:&nbsp;</td><td>%10</td></tr>"
+                             "<tr><td><b>%9</b></td><td>&nbsp;:&nbsp;</td><td>%11</td></tr>"
+                             "</table>"
                              "</p>")
-                     .arg(tr("Copyright"))
-                     .arg(tr("All rights reserved"))
-                     .arg(tr("This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 2.1 of the License, or (at your option) any later version."))
-                     .arg(tr("This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.")));
+                     .arg(tr("is copyright")) /* 1 */
+                     .arg(tr("All rights reserved")) /* 2 */
+                     .arg(MagickCore::GetMagickLicense()) /* 3 */
+                     .arg(magickInfo) /* 4 */
+                     .arg(magickDepth) /* 5 */
+                     .arg(MagickCore::GetMagickCopyright()) /* 6 */
+                     .arg(tr("Powered by")) /* 7 */
+                     .arg(tr("Memory limit")) /* 8 */
+                     .arg(tr("Thread limit")) /* 9 */
+                     .arg(CyanCommon::humanFileSize(Magick::ResourceLimits::memory())) /* 10 */
+                     .arg(Magick::ResourceLimits::thread()) /* 11 */
+                     .arg(MagickCore::GetMagickFeatures()) /* 12 */
+                     );
     textLabel->setText(textString);
+
     headerLayout->addWidget(textLabel);
     headerLayout->addStretch();
-    mainLayout->addWidget(headerContainer);
-    mainLayout->addWidget(footerLabel);
+    footerLayout->addWidget(ghButton);
+    footerLayout->addStretch();
+    footerLayout->addWidget(qtButton);
+
+    mainLayout->addWidget(headerWidget);
+    mainLayout->addWidget(footerWidget);
+
+    connect(ghButton, SIGNAL(clicked()), this, SLOT(ghButtonTriggered()));
+    connect(qtButton, SIGNAL(clicked()), this, SLOT(qtButtonTriggered()));
+}
+
+void CyanAboutDialog::qtButtonTriggered()
+{
+    QMessageBox::aboutQt(this, tr("About Qt"));
+}
+
+void CyanAboutDialog::ghButtonTriggered()
+{
+   QDesktopServices::openUrl(QUrl::fromUserInput("https://github.com/rodlie/cyan"));
 }

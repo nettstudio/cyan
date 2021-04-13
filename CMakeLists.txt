@@ -1,13 +1,13 @@
 #
 # Cyan <https://cyan.fxarena.net>
-# Copyright Ole-André Rodlie, FxArena DA.
+# Copyright (c) Ole-André Rodlie. All rights reserved.
 #
-# This program is free software; you can redistribute it and/or
+# This file is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
 # License as published by the Free Software Foundation; either
 # version 2.1 of the License, or (at your option) any later version.
 #
-# This program is distributed in the hope that it will be useful,
+# This file is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 # Lesser General Public License for more details.
@@ -15,21 +15,42 @@
 
 cmake_minimum_required(VERSION 3.0)
 
-project(Cyan VERSION 1.99.4)
+project(Cyan VERSION 2021.1.0)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(COMPANY "FxArena")
 set(COPYRIGHT "Copyright Ole-Andre Rodlie. All rights reserved.")
 set(IDENTIFIER "net.fxarena.cyan")
 set(MAGICK_PKG_CONFIG "Magick++" CACHE STRING "ImageMagick pkg-config name")
-option(BUILD_PLUGIN_COLOR_TRIANGLE "Build color triangle plugin" OFF)
+set(PROJECT_EDITION "Development Release" CACHE STRING "Edition")
+option(PLUGINS_SUPPORT "Experimental plug-ins support" OFF)
 option(DEBUG_TILES "Show tiles for debug purpose" OFF)
 option(RUNTIME_WARNINGS "Show warnings during runtime" OFF)
+option(LINUX_DEPLOY "Linux deploy (internal use)" OFF)
 
-set(HEADERS_API lib/CyanWidgetApi.h)
+if(NOT WIN32)
+    set(CYAN_APP_BIN "${PROJECT_NAME}App")
+    set(CYAN_LIB_BIN "${PROJECT_NAME}")
+else()
+    set(CYAN_APP_BIN "${PROJECT_NAME}")
+    set(CYAN_LIB_BIN "lib${PROJECT_NAME}")
+endif()
+
+if(WIN32)
+    set(IMAGEMAGICK_WINDOWS "C:/Users/olear/Documents/ImageMagick-Windows" CACHE STRING "VisualMagick")
+    include_directories(${IMAGEMAGICK_WINDOWS}/ImageMagick/Magick++/lib ${IMAGEMAGICK_WINDOWS}/ImageMagick ${IMAGEMAGICK_WINDOWS}/lcms/include)
+    link_directories(${IMAGEMAGICK_WINDOWS}/VisualMagick/lib ${IMAGEMAGICK_WINDOWS}/VisualMagick/bin)
+endif()
+
+if(${LINUX_DEPLOY})
+    set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib/x86_64-linux-gnu")
+endif()
+
+set(HEADERS_API lib/CyanWidgetApi.h lib/CyanEffectApi.h)
 set(HEADERS_APP app/editor.h)
 set(SOURCES_LIB
     lib/CyanAboutDialog.cpp
@@ -50,6 +71,7 @@ set(SOURCES_LIB
     lib/CyanNewMediaDialog.cpp
     lib/CyanGuideItem.cpp
     lib/CyanBatchWidget.cpp
+    lib/CyanHistory.cpp
     lib/qtcolorpicker.cpp
     #lib/qtcolortriangle.cpp
     lib/qtwindowlistmenu.cpp
@@ -73,6 +95,7 @@ set(HEADERS_LIB
     lib/CyanNewMediaDialog.h
     lib/CyanGuideItem.h
     lib/CyanBatchWidget.h
+    lib/CyanHistory.h
     lib/CyanGlobal.h
     lib/qtcolorpicker.h
     #lib/qtcolortriangle.h
@@ -94,40 +117,43 @@ set(RESOURCES
 )
 
 add_definitions(-DCYAN_VERSION="${PROJECT_VERSION}")
-add_definitions(-DCYAN_IMAGE_FORMAT_VERSION="${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}")
+add_definitions(-DCYAN_VERSION_MAJOR="${PROJECT_VERSION_MAJOR}")
+add_definitions(-DCYAN_VERSION_MINOR="${PROJECT_VERSION_MINOR}")
+add_definitions(-DCYAN_VERSION_PATCH="${PROJECT_VERSION_PATCH}")
+add_definitions(-DCYAN_EDITION="${PROJECT_EDITION}")
+add_definitions(-DCYAN_PROJECT_VERSION="${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}")
 add_definitions(-DCYAN_LIBRARY)
 
 find_package(Qt5 5.5 REQUIRED Core Gui Widgets Concurrent Test)
-find_package(PkgConfig REQUIRED)
-pkg_search_module(MAGICK REQUIRED ${MAGICK_PKG_CONFIG}>=7.0.8)
-pkg_search_module(LCMS2 REQUIRED lcms2)
-pkg_search_module(FONTCONF REQUIRED fontconfig)
-
-if (APPLE)
-    set(FC_FONTS_DIR "<dir>/System/Library/Fonts</dir><dir>/Library/Fonts</dir><dir>~/Library/Fonts</dir>")
-    set(FC_CACHE_DIR "<cachedir>~/.cache/fontconfig</cachedir>")
-elseif(WIN32)
-    set(FC_FONTS_DIR "<dir>WINDOWSFONTDIR</dir><dir>~/AppData/Local/Microsoft/Windows/Fonts</dir>")
-    set(FC_CACHE_DIR "<cachedir>LOCAL_APPDATA_FONTCONFIG_CACHE</cachedir>")
-else()
-    set(FC_FONTS_DIR "<dir>/usr/share/fonts/OTF</dir><dir>/usr/share/fonts/TTF</dir><dir>/usr/share/fonts/Type1</dir><dir>/usr/share/fonts/Speedo</dir><dir>/usr/share/fonts/cyrillic</dir><dir>/usr/share/fonts/misc</dir><dir prefix=\"xdg\">fonts</dir>")
-    set(FC_CACHE_DIR "<cachedir prefix=\"xdg\">fontconfig</cachedir><cachedir>~/.fontconfig</cachedir>")
+if(NOT WIN32)
+    find_package(PkgConfig REQUIRED)
+    pkg_search_module(MAGICK REQUIRED ${MAGICK_PKG_CONFIG}>=7.0.10)
+    pkg_search_module(LCMS2 REQUIRED lcms2)
+    #pkg_search_module(FONTCONF REQUIRED fontconfig)
 endif()
-configure_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/share/fonts.conf.in
-    ${CMAKE_CURRENT_BINARY_DIR}/etc/fonts/fonts.conf
-    @ONLY
-)
 
-include_directories(
-    app
-    lib
-    ${MAGICK_INCLUDE_DIRS}
-    ${LCMS2_INCLUDE_DIRS}
-    ${FONTCONF_INCLUDE_DIRS}
-)
+#if (APPLE)
+#    set(FC_FONTS_DIR "<dir>/System/Library/Fonts</dir><dir>/Library/Fonts</dir><dir>~/Library/Fonts</dir>")
+#    set(FC_CACHE_DIR "<cachedir>~/.cache/fontconfig</cachedir>")
+#elseif(WIN32)
+#    set(FC_FONTS_DIR "<dir>WINDOWSFONTDIR</dir><dir>~/AppData/Local/Microsoft/Windows/Fonts</dir>")
+#    set(FC_CACHE_DIR "<cachedir>LOCAL_APPDATA_FONTCONFIG_CACHE</cachedir>")
+#else()
+#    set(FC_FONTS_DIR "<dir>/usr/share/fonts/OTF</dir><dir>/usr/share/fonts/TTF</dir><dir>/usr/share/fonts/Type1</dir><dir>/usr/share/fonts/Speedo</dir><dir>/usr/share/fonts/cyrillic</dir><dir>/usr/share/fonts/misc</dir><dir prefix=\"xdg\">fonts</dir>")
+#    set(FC_CACHE_DIR "<cachedir prefix=\"xdg\">fontconfig</cachedir><cachedir>~/.fontconfig</cachedir>")
+#endif()
+#configure_file(
+#    ${CMAKE_CURRENT_SOURCE_DIR}/share/fonts.conf.in
+#    ${CMAKE_CURRENT_BINARY_DIR}/etc/fonts/fonts.conf
+#    @ONLY
+#)
 
-add_compile_options(-Wall -Wextra)
+include_directories(app lib)
+if(NOT WIN32)
+    include_directories( ${MAGICK_INCLUDE_DIRS} ${LCMS2_INCLUDE_DIRS}) # ${FONTCONF_INCLUDE_DIRS})
+    add_compile_options(-Wall -Wextra)
+endif()
+
 if(CMAKE_BUILD_TYPE MATCHES "^(release|Release|RELEASE)$")
     add_definitions(-DQT_NO_DEBUG_OUTPUT)
 else()
@@ -138,6 +164,9 @@ if(${DEBUG_TILES})
 endif()
 if(${RUNTIME_WARNINGS})
     add_definitions(-DSHOW_WARN)
+endif()
+if(${PLUGINS_SUPPORT})
+    add_definitions(-DENABLE_PLUGINS)
 endif()
 
 if(APPLE)
@@ -177,59 +206,113 @@ if(WIN32)
     )
 endif()
 
+add_library(
+    ${CYAN_LIB_BIN}
+    SHARED
+    ${SOURCES_LIB}
+    ${HEADERS_LIB}
+    ${HEADERS_API}
+)
+set_target_properties(
+    ${CYAN_LIB_BIN}
+    PROPERTIES
+    VERSION
+    ${PROJECT_VERSION}
+)
+set_target_properties(
+    ${CYAN_LIB_BIN}
+    PROPERTIES
+    SOVERSION
+    ${PROJECT_VERSION_MAJOR}
+)
+set_target_properties(
+    ${CYAN_LIB_BIN}
+    PROPERTIES
+    SOVERSION
+    ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
+)
+
 if(APPLE)
     add_executable(
-        ${PROJECT_NAME}
+        ${CYAN_APP_BIN}
         MACOSX_BUNDLE
         ${ICON_FILE}
         ${SOURCES_APP}
-        ${SOURCES_LIB}
+        #${SOURCES_LIB}
         ${HEADERS_APP}
-        ${HEADERS_LIB}
+        #${HEADERS_LIB}
         ${HEADERS_API}
         ${RESOURCES}
     )
 elseif(WIN32)
     add_executable(
-        ${PROJECT_NAME}
+        ${CYAN_APP_BIN}
         WIN32
         ${ICON_FILE}
         ${WINDOWS_RESOURCE_FILE}
         ${SOURCES_APP}
-        ${SOURCES_LIB}
+        #${SOURCES_LIB}
         ${HEADERS_APP}
-        ${HEADERS_LIB}
+        #${HEADERS_LIB}
         ${HEADERS_API}
         ${RESOURCES}
     )
 else()
     add_executable(
-        ${PROJECT_NAME}
+        ${CYAN_APP_BIN}
         ${SOURCES_APP}
-        ${SOURCES_LIB}
+        #${SOURCES_LIB}
         ${HEADERS_APP}
-        ${HEADERS_LIB}
+        #${HEADERS_LIB}
         ${HEADERS_API}
         ${RESOURCES})
 endif()
 
-target_compile_options(${PROJECT_NAME} PRIVATE ${MAGICK_STATIC_CFLAGS})
+if(NOT WIN32)
+    set_target_properties(${CYAN_APP_BIN} PROPERTIES OUTPUT_NAME ${CYAN_LIB_BIN})
+endif()
+
 target_link_libraries(
-    ${PROJECT_NAME}
+    ${CYAN_APP_BIN}
     Qt5::Core
     Qt5::Gui
     Qt5::Widgets
     Qt5::Concurrent
-    ${MAGICK_STATIC_LIBRARIES}
-    ${LCMS2_LIBRARIES}
-    ${MAGICK_STATIC_LDFLAGS}
-    ${LCMS2_LDFLAGS}
-    ${FONTCONF_LDFLAGS}
+    ${CYAN_LIB_BIN}
 )
+
+target_link_libraries(
+    ${CYAN_LIB_BIN}
+    Qt5::Core
+    Qt5::Gui
+    Qt5::Widgets
+    Qt5::Concurrent
+)
+
+if(WIN32)
+    if(CMAKE_BUILD_TYPE MATCHES "^(release|Release|RELEASE)$")
+        target_link_libraries(${CYAN_APP_BIN} CORE_RL_lcms_ CORE_RL_MagickCore_ CORE_RL_MagickWand_ CORE_RL_Magick++_)
+        target_link_libraries(${CYAN_LIB_BIN} CORE_RL_lcms_ CORE_RL_MagickCore_ CORE_RL_MagickWand_ CORE_RL_Magick++_)
+    else()
+        target_link_libraries(${CYAN_APP_BIN} CORE_DB_lcms_ CORE_DB_MagickCore_ CORE_DB_MagickWand_ CORE_DB_Magick++_)
+        target_link_libraries(${CYAN_LIB_BIN} CORE_DB_lcms_ CORE_DB_MagickCore_ CORE_DB_MagickWand_ CORE_DB_Magick++_)
+    endif()
+else()
+    target_compile_options(${CYAN_APP_BIN} PRIVATE ${MAGICK_CFLAGS})
+    target_compile_options(${CYAN_LIB_BIN} PRIVATE ${MAGICK_CFLAGS})
+    target_link_libraries(${CYAN_APP_BIN} ${MAGICK_LIBRARIES} ${LCMS2_LIBRARIES} ${MAGICK_LDFLAGS} ${LCMS2_LDFLAGS})
+    target_link_libraries(${CYAN_LIB_BIN} ${MAGICK_LIBRARIES} ${LCMS2_LIBRARIES} ${MAGICK_LDFLAGS} ${LCMS2_LDFLAGS})
+endif()
 
 if(UNIX AND NOT APPLE)
     include(GNUInstallDirs)
-    install(TARGETS ${PROJECT_NAME} DESTINATION ${CMAKE_INSTALL_BINDIR})
+    if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+        set(LIB_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR})
+    else()
+        set(LIB_INSTALL_DIR ${CMAKE_INSTALL_FULL_LIBDIR})
+    endif()
+    install(TARGETS ${CYAN_LIB_BIN} DESTINATION ${LIB_INSTALL_DIR})
+    install(TARGETS ${CYAN_APP_BIN} DESTINATION ${CMAKE_INSTALL_BINDIR})
     install(
         DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/share/icons/hicolor/128x128
         DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor
@@ -301,16 +384,14 @@ if(UNIX AND NOT APPLE)
         FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/share/icc/ISOcoated_v2_300_bas.icc
         ${CMAKE_CURRENT_SOURCE_DIR}/share/icc/ISOcoated_v2_grey1c_bas.icc
-        ${CMAKE_CURRENT_SOURCE_DIR}/share/icc/SWOP2006_Coated5v2.icc
-        ${CMAKE_CURRENT_SOURCE_DIR}/share/icc/sRGB2014.icc
         ${CMAKE_CURRENT_SOURCE_DIR}/share/icc/sRGB_IEC61966-2-1_no_black_scaling.icc
-        ${CMAKE_CURRENT_SOURCE_DIR}/share/icc/sRGB_v4_ICC_preference.icc
         DESTINATION
         ${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME}/profiles
     )
     install(
         FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/COPYING
+        ${CMAKE_CURRENT_SOURCE_DIR}/COPYING.LIB
         ${CMAKE_CURRENT_SOURCE_DIR}/GPL_EXCEPTION
         ${CMAKE_CURRENT_SOURCE_DIR}/docs/README.md
         DESTINATION
@@ -318,8 +399,11 @@ if(UNIX AND NOT APPLE)
     )
 endif()
 
+#if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/plugins/CyanColorTriangle)
+#    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/plugins/CyanColorTriangle)
+#endif()
 
-# Include Cyan Color Triangle Widget
-if(BUILD_PLUGIN_COLOR_TRIANGLE)
-    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/plugins/CyanColorTriangle)
-endif()
+#if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/plugins/CyanTextEditor)
+#    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/plugins/CyanTextEditor)
+#endif()
+

@@ -65,6 +65,8 @@ Editor::Editor(QWidget *parent)
     , viewZoom100Act(nullptr)
     , viewZoomFitAct(nullptr)
     , aboutCyanAct(nullptr)
+    , undoAct(nullptr)
+    , redoAct(nullptr)
     , convertRGBAct(nullptr)
     , convertCMYKAct(nullptr)
     , convertGRAYAct(nullptr)
@@ -73,7 +75,6 @@ Editor::Editor(QWidget *parent)
     , addGuideVAct(nullptr)
     , addGuideHAct(nullptr)
     , showGuidesAct(nullptr)
-    , magickMemoryResourcesGroup(nullptr)
     , viewModeGroup(nullptr)
     , profileRGBGroup(nullptr)
     , profileCMYKGroup(nullptr)
@@ -100,7 +101,7 @@ Editor::Editor(QWidget *parent)
     , layersButton(nullptr)
     , colorsButton(nullptr)
     , layersWidget(nullptr)
-    , colorPicker(nullptr)
+    //, colorPicker(nullptr)
     , currentZoomStatusIcon(nullptr)
     , currentZoomStatusLabel(nullptr)
     , mainSplitter(nullptr)
@@ -121,8 +122,10 @@ Editor::Editor(QWidget *parent)
 
     // setup UI and load settings
     setupUI();
+#ifdef ENABLE_PLUGINS
     pluginHandler = new CyanPlugins(this);
     initPlugins(pluginHandler->scan());
+#endif
     loadSettings();
 }
 
@@ -130,7 +133,9 @@ Editor::Editor(QWidget *parent)
 Editor::~Editor()
 {
     saveSettings();
+#ifdef ENABLE_PLUGINS
     pluginHandler->removePlugins();
+#endif
 }
 
 // get current active canvas
@@ -157,14 +162,14 @@ void Editor::initPlugins(QList<QPluginLoader *> plugins)
         CyanWidgetPlugin *widgetPlugin = qobject_cast<CyanWidgetPlugin*>(plugin);
         if (widgetPlugin) {
             initWidgetPlugin(widgetPlugin);
-            connect(colorPicker,
+            /*connect(colorPicker,
                     SIGNAL(colorChanged(QColor)),
                     plugin,
                     SLOT(setCurrentColor(QColor)));
             connect(plugin,
                     SIGNAL(currentColorChanged(QColor)),
                     colorPicker,
-                    SLOT(setCurrentColor(QColor)));
+                    SLOT(setCurrentColor(QColor)));*/
             if (widgetPlugin->isText()) {
                 hasTextSupport = true;
                 connect(this,
@@ -207,7 +212,7 @@ void Editor::initWidgetPlugin(CyanWidgetPlugin *plugin)
         break;
     default:;
     }
-    plugin->setCurrentColor(colorPicker->currentColor());
+    //plugin->setCurrentColor(colorPicker->currentColor());
 }
 
 // save global settings
@@ -215,13 +220,6 @@ void Editor::saveSettings()
 {
     emit statusMessage(tr("Saving settings ..."));
     QSettings settings;
-
-    settings.beginGroup("engine");
-    settings.setValue("disk_limit",
-                      CyanCommon::getDiskResource());
-    settings.setValue("memory_limit",
-                      CyanCommon::getMemoryResource());
-    settings.endGroup();
 
     settings.beginGroup("gui");
     settings.setValue("editor_state",
@@ -293,25 +291,9 @@ void Editor::loadSettings()
     QSettings settings;
 
     settings.beginGroup("engine");
-    CyanCommon::setDiskResource(settings
-                            .value("disk_limit", 0).toInt());
-    int maxMem = settings.value("memory_limit",
-                                CyanImageFormat::supportedQuantumDepth()>8?4:2).toInt();
-    CyanCommon::setMemoryResource(maxMem);
+    CyanCommon::setDiskResource(0);
+    CyanCommon::setMemoryResource(CyanCommon::getTotalRam());
     settings.endGroup();
-
-    QList<QAction*> memActions = magickMemoryResourcesGroup->actions();
-    bool foundAct = false;
-    for (int i=0;i<memActions.size();++i) {
-        QAction *act = memActions.at(i);
-        if (!act) { continue; }
-        if (act->data().toInt()==maxMem) {
-            act->setChecked(true);
-            foundAct = true;
-            break;
-        }
-    }
-    if (!foundAct) { memoryMenu->setDisabled(true); }
 
     settings.beginGroup("gui");
     if (settings.value("editor_state").isValid()) {
@@ -385,13 +367,6 @@ void Editor::loadSettings()
     if (settings.value("editor_maximized").toBool()) { showMaximized(); }
     settings.endGroup();
 
-    emit statusMessage(QString("%2: %1 GB")
-                       .arg(CyanCommon::getDiskResource())
-                       .arg(tr("Engine disk cache limit")));
-    emit statusMessage(QString("%2: %1 GB")
-                       .arg(CyanCommon::getMemoryResource())
-                       .arg(tr("Engine memory limit")));
-
     // setup color profiles
     qDebug() << "setup color profiles";
     setDefaultColorProfiles();
@@ -414,6 +389,9 @@ void Editor::loadSettings()
 
     // check if we have the required color profiles needed to do anything
     QTimer::singleShot(100, this, SLOT(hasColorProfiles()));
+
+    // check if we have a supported version of ImageMagick
+    QTimer::singleShot(500, this, SLOT(hasImageMagick()));
 }
 
 const QString Editor::loadSettingsLastOpenDir()
@@ -829,11 +807,23 @@ void Editor::saveImageDialog(bool ignoreExisting, bool setFilename)
     } else if (filename.endsWith(".psd",
                                  Qt::CaseInsensitive))
     {
+        int ret = QMessageBox::question(this,
+                                        tr("Export to PSD"),
+                                        tr("Are you sure you want to export to PSD?"),
+                                        QMessageBox::Yes|QMessageBox::No,
+                                        QMessageBox::No);
+        if (ret != QMessageBox::Yes) { return; }
         QtConcurrent::run(this,
                           &Editor::writeProjectPSD,
                           filename,
                           setFilename);
     } else {
+        int ret = QMessageBox::question(this,
+                                        tr("Export to %1").arg(fileInfo.suffix().toUpper()),
+                                        tr("Are you sure you want to export to %1?").arg(fileInfo.suffix().toUpper()),
+                                        QMessageBox::Yes|QMessageBox::No,
+                                        QMessageBox::No);
+        if (ret != QMessageBox::Yes) { return; }
         QtConcurrent::run(this,
                           &Editor::writeImage,
                           filename,
@@ -1131,6 +1121,16 @@ bool Editor::hasDirtyProjects()
     return false;
 }
 
+void Editor::hasImageMagick()
+{
+    QString version = CyanCommon::supportedImageMagickVersion();
+    if (!version.isEmpty()) {
+        QMessageBox::warning(this,
+                             tr("Unsupported ImageMagick version"),
+                             tr("ImageMagick version %1 is not supported. If you continue to use this application you may encounter several issues, use at own risk!").arg(version));
+    }
+}
+
 void Editor::setActionsDisabled(bool disabled)
 {
     saveImageAct->setDisabled(disabled);
@@ -1162,6 +1162,20 @@ void Editor::setProjectSaveDisabled(bool disabled)
     //saveProjectAct->setDisabled(disabled);
 }
 
+void Editor::setViewUndo()
+{
+    View *view = getCurrentCanvas();
+    if (!view) { return; }
+    view->setUndo();
+}
+
+void Editor::setViewRedo()
+{
+    View *view = getCurrentCanvas();
+    if (!view) { return; }
+    view->setRedo();
+}
+
 void Editor::handleAddGuideHAct(bool triggered)
 {
     Q_UNUSED(triggered)
@@ -1190,16 +1204,6 @@ void Editor::handleShowGuidesAct(bool triggered)
         View *view = qobject_cast<View*>(tab->widget());
         if (!view) { continue; }
         view->showGuides(showGuidesAct->isChecked());
-    }
-}
-
-void Editor::handleMagickMemoryAct(bool triggered)
-{
-    Q_UNUSED(triggered)
-    QAction *action = qobject_cast<QAction*>(sender());
-    if (!action) { return; }
-    if (action->data().toInt()>=2) {
-        CyanCommon::setMemoryResource(action->data().toInt());
     }
 }
 

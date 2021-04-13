@@ -25,6 +25,15 @@
 #include <QRegularExpression>
 #include <QRegularExpressionMatch>
 #include <QApplication>
+#include <QVector>
+
+#ifdef Q_OS_WIN
+#include <Windows.h>
+#elif defined(Q_OS_LINUX)
+#include <unistd.h>
+#endif
+
+
 
 #define RESOURCE_BYTE 1050000000
 
@@ -100,19 +109,36 @@ int CyanCommon::getMemoryResource()
 
 void CyanCommon::setMemoryResource(int gib)
 {
+    if (gib < 2) { gib = 2; } // 2 is minimum
     try {
         Magick::ResourceLimits::memory(static_cast<qulonglong>(gib)*static_cast<qulonglong>(RESOURCE_BYTE));
         Magick::ResourceLimits::map(static_cast<qulonglong>(gib)*static_cast<qulonglong>(RESOURCE_BYTE));
     }
     catch(Magick::Error &error_ ) { qWarning() << error_.what(); }
-    catch(Magick::Warning &warn_ ) {
-        qDebug() << warn_.what();
-    }
+    catch(Magick::Warning &warn_ ) { qDebug() << warn_.what(); }
+}
+
+int CyanCommon::getTotalRam(int percent)
+{
+#ifdef Q_OS_WIN
+    unsigned long long physicalMemory = 0;
+    GetPhysicallyInstalledSystemMemory(&physicalMemory);
+    int gib = qRound(static_cast<double>((physicalMemory*1024)/RESOURCE_BYTE));
+    return qRound(static_cast<double>((gib*percent)/100));
+#elif defined(Q_OS_LINUX)
+#if defined _SC_PHYS_PAGES && defined _SC_PAGESIZE
+    unsigned long long physicalMemory = sysconf(_SC_PHYS_PAGES)*sysconf(_SC_PAGESIZE);
+    int gib = qRound(static_cast<double>(physicalMemory/1024000000));
+    return qRound(static_cast<double>((gib*percent)/100));
+#endif
+#endif
+    Q_UNUSED(percent)
+    return 4; // fallback to 4
 }
 
 void CyanCommon::setThreadResources(int thread)
 {
-    if (thread == 0) { return; }
+    if (thread < 1) { return; }
     Magick::ResourceLimits::thread(static_cast<qulonglong>(thread));
 }
 
@@ -325,5 +351,18 @@ const QString CyanCommon::colorspaceToString(Magick::ColorspaceType colorspace)
         result = QObject::tr("Other");
     }
     return result;
+}
+
+const QString CyanCommon::supportedImageMagickVersion()
+{
+    QVector<QString> versions;
+    versions.push_back("7.0.10-26");
+    versions.push_back("7.0.11-4");
+
+    size_t magickV;
+    QString version = QString(MagickCore::GetMagickVersion(&magickV)).split("Q").takeFirst().split("ImageMagick").takeLast().trimmed();
+
+    if (versions.contains(version)) { return  QString(); }
+    return version;
 }
 
