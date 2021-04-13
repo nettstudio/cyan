@@ -15,6 +15,7 @@
 #
 */
 #include "editor.h"
+#include "CyanFFmpeg.h"
 
 void Editor::newTab(CyanImageFormat::CyanCanvas canvas)
 {
@@ -132,6 +133,31 @@ void Editor::newTab(Magick::Image image, QSize geo)
     setCurrentZoom();
 }
 
+void Editor::newVTab(Magick::Image image, QString filename)
+{
+    qDebug() << "new tab from video";
+
+    MdiSubWindow *tab = new MdiSubWindow(mdi);
+    tab->setAttribute(Qt::WA_DeleteOnClose);
+
+    View *view = new View(tab, false, _native);
+    connectView(view);
+
+    view->setCanvasSpecsFromImage(image);
+    view->setCanvasBackgroundImage(image);
+    view->setVideo(filename, 0, CyanFFmpeg::getVideoMaxFrames(filename));
+    view->setFit(viewZoomFitAct->isChecked());
+
+    tab->setWidget(view);
+    tab->showMaximized();
+    tab->setWindowIcon(QIcon::fromTheme("applications-graphics"));
+
+    setViewTool(view);
+    updateTabTitle(view);
+    handleTabActivated(tab);
+    setCurrentZoom();
+}
+
 void Editor::handleTabActivated(QMdiSubWindow *tab)
 {
     qDebug() << "handle tab activated";
@@ -160,5 +186,16 @@ void Editor::updateTabTitle(View *view)
     QString title = CyanCommon::canvasWindowTitle(view->getCanvas());
     qDebug() << "update canvas title" << title;
     view->setWindowTitle(title);
+    qDebug() << "view has video?" << view->getVideoFilename() << view->getVideoFrameRange() << view->getVideoCurrentFrame();
+
+    videoSlider->blockSignals(true);
+    if (view->getVideoFrameRange().second > 0) {
+        videoSlider->setRange(view->getVideoFrameRange().first, view->getVideoFrameRange().second);
+        videoSlider->setValue(view->getVideoCurrentFrame());
+    } else {
+        videoSlider->setRange(0,0);
+        videoSlider->setValue(0);
+    }
+    videoSlider->blockSignals(false);
 }
 

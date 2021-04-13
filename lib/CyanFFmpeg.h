@@ -18,13 +18,6 @@
 #ifndef CYANFFMPEG_H
 #define CYANFFMPEG_H
 
-#ifdef WITH_FFMPEG
-extern "C" {
-#include <libavutil/avutil.h>
-#include <libavutil/imgutils.h>
-#include <libavdevice/avdevice.h>
-#include <libswscale/swscale.h>
-}
 #include <Magick++.h>
 #include <QByteArray>
 #include <QString>
@@ -37,6 +30,5 @@ public:
     static Magick::Image getVideoFrame(const QString &filename,
                                        int frame = 0);
 };
-#endif
 
 #endif // CYANFFMPEG_H

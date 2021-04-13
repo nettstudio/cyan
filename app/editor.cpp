@@ -40,6 +40,7 @@
 #include "CyanColorConvertDialog.h"
 #include "CyanColorConvert.h"
 #include "CyanAboutDialog.h"
+#include "CyanFFmpeg.h"
 
 Editor::Editor(QWidget *parent)
     : QMainWindow(parent)
@@ -573,6 +574,41 @@ void Editor::loadImage(const QString &filename)
     }
 }
 
+void Editor::loadVideo(const QString &filename)
+{
+    qDebug() << "loadVideo" << filename;
+    if (filename.isEmpty()) { return; }
+    qDebug() << "read image" << filename << CyanImageFormat::hasLayers(filename);
+    Magick::Image image;
+    image.quiet(false);
+
+    try {
+        image = CyanFFmpeg::getVideoFrame(filename);
+        QFileInfo fileInfo(filename);
+        image.label(fileInfo.baseName().toStdString());
+    }
+    catch(Magick::Error &error_ ) {
+        emit errorMessage(error_.what());
+        return;
+    }
+    catch(Magick::Warning &warn_ ) { emit warningMessage(warn_.what()); }
+
+    try {
+        image.magick("MIFF"); // force internal format
+        image.fileName(filename.toStdString());
+        if (image.label().empty()) { // add label, use filename as fallback
+            QFileInfo fileInfo(filename);
+            image.label(fileInfo.baseName().toStdString());
+        }
+
+        if (image.columns()>0 && image.rows()>0) {
+            newVTab(image, filename);
+        }
+    }
+    catch(Magick::Error &error_ ) { emit errorMessage(error_.what()); }
+    catch(Magick::Warning &warn_ ) { emit warningMessage(warn_.what()); }
+}
+
 // read "regular" new image
 // TODO: ping file first!
 void Editor::readImage(Magick::Blob blob,
@@ -586,7 +622,14 @@ void Editor::readImage(Magick::Blob blob,
         if (blob.length()>0) {
             image.read(blob);
         } else if (!filename.isEmpty()) {
-            image.read(filename.toStdString());
+            QMimeDatabase db;
+            QMimeType type = db.mimeTypeForFile(filename);
+            qDebug() << "Mime type:" << type.name();
+            if (type.name().contains("video")) {
+                image = CyanFFmpeg::getVideoFrame(filename);
+            } else {
+                image.read(filename.toStdString());
+            }
         } else { return; }
     }
     catch(Magick::Error &error_ ) {
@@ -881,7 +924,7 @@ void Editor::loadImageDialog()
                                                     tr("Open Media"),
                                                     loadSettingsLastOpenDir(),
                                                     QString("%2 (%1)")
-                                                    .arg(CyanImageFormat::supportedReadFormats())
+                                                    .arg(/*CyanImageFormat::supportedReadFormats()*/"*.*")
                                                     .arg(tr("Media files")));
     if (filename.isEmpty() || !QFile::exists(filename)) { return; }
 
@@ -892,8 +935,14 @@ void Editor::loadImageDialog()
 
     QMimeDatabase db;
     QMimeType type = db.mimeTypeForFile(filename);
-    if (type.name().startsWith(QString("audio")) ||
-        type.name().startsWith(QString("video"))) { return; } // TODO! ping file to see if it's a loadable image
+    qDebug() << "load" << type.name();
+    if (type.name().startsWith(QString("audio"))) {
+        return;
+    }
+    if (type.name().startsWith(QString("video"))) {
+        loadVideo(filename);
+        return;
+    } // TODO! ping file to see if it's a loadable image
     loadImage(filename);
 }
 
@@ -1289,6 +1338,24 @@ void Editor::handleOpenLayers(const QList<QUrl> &urls)
     // workaround issues with dialogs
     update();
     view->scene()->update();
+}
+
+void Editor::handleVideoSliderValueChanged(int value)
+{
+    qDebug() << "handle video slider changed" << value;
+    View *view = qobject_cast<View*>(getCurrentCanvas());
+    if (!view) { return; }
+    if (view->getVideoFilename().isEmpty()) { return; }
+    view->setVideoCurrentFrame(value);
+}
+
+void Editor::handleVideoSliderReleased()
+{
+    qDebug() << "handle video slider released" << videoSlider->value();
+    View *view = qobject_cast<View*>(getCurrentCanvas());
+    if (!view) { return; }
+    if (view->getVideoFilename().isEmpty()) { return; }
+    view->setVideoCurrentFrame(videoSlider->value(), true);
 }
 
 void Editor::resizeEvent(QResizeEvent *e)

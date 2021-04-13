@@ -34,6 +34,7 @@
 #include <QFuture>
 #include <QKeyEvent>
 #include <QList>
+#include <QPair>
 
 #include "CyanGlobal.h"
 #include "CyanImageFormat.h"
@@ -84,12 +85,16 @@ private:
     bool _moving;
     int _selectedLayer;
     QFuture<void> future;
+    QFuture<void> vfuture;
     bool _supportsLayers;
     //CyanRuler *_hRuler;
     //CyanRuler *_vRuler;
     bool _showGuides;
     View::InteractiveMode _mode;
     CyanHistory _history;
+    QPair<int, int> _frameRange;
+    int _frameCurrent;
+    QString _video;
 
 signals:
     void zoomChanged();
@@ -119,6 +124,8 @@ signals:
     void canvasStatusChanged();
     void moveLayerSignalUp(int id);
     void moveLayerSignalDown(int id);
+
+    void newCanvasBackgroundImage(Magick::Image image);
 
 public slots:
     void doZoom(double scaleX,
@@ -224,6 +231,15 @@ public slots:
     void setUndo(bool state = true);
     void setRedo();
 
+    void setCanvasBackgroundImage(Magick::Image image);
+    void setVideo(QString &filename, int frameStart, int frameEnd);
+    QString getVideoFilename();
+    void setVideoFilename(QString &filename);
+    QPair<int,int> getVideoFrameRange();
+    void setVideoFrameRange(QPair<int,int> range);
+    int getVideoCurrentFrame();
+    void setVideoCurrentFrame(int frame, bool force = false);
+
 private slots:
     void handleLayerMoving(QPointF pos,
                            int id,
@@ -261,6 +277,9 @@ private slots:
     void renderLayerText(int id, bool update);
 
     void addUndo(int id, QSize pos = QSize(0, 0), bool usePos = false);
+
+    void handleNewCanvasBackground(Magick::Image image);
+    void getCanvasBackgroundFrame(QString &filename, int frame);
 
 protected:
     void wheelEvent(QWheelEvent* event);

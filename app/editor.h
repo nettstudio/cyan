@@ -152,6 +152,9 @@ private:
 
     bool _native;
 
+    QSlider *videoSlider;
+
+
 signals:
     void openImage(const QString &filename);
     void statusMessage(const QString &message);
@@ -223,6 +226,7 @@ private slots:
     void newTab(CyanImageFormat::CyanCanvas canvas);
     void newTab(Magick::Image image = Magick::Image(),
                 QSize geo = QSize(0, 0));
+    void newVTab(Magick::Image image, QString filename);
     void handleTabActivated(QMdiSubWindow *tab);
     void updateTabTitle(View *view = nullptr);
 
@@ -271,6 +275,7 @@ private slots:
 
     //void saveImage(const QString &filename);
     void loadImage(const QString &filename);
+    void loadVideo(const QString &filename);
     void readImage(Magick::Blob blob, const QString &filename = QString());
     void readImage(const QString &filename);
     void writeImage(const QString &filename, bool setFilename = true);
@@ -321,6 +326,10 @@ private slots:
     // TODO
     void handleOpenImages(const QList<QUrl> &urls);
     void handleOpenLayers(const QList<QUrl> &urls);
+
+    // video
+    void handleVideoSliderValueChanged(int value);
+    void handleVideoSliderReleased();
 
 protected:
     void resizeEvent(QResizeEvent *e) override;

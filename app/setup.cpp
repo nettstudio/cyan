@@ -227,6 +227,10 @@ void Editor::setupUI()
     if (_native) { nativeStyle->setChecked(true); }
     else { appStyle->setChecked(true); }
 
+
+    // test
+    bottomSplitter->addWidget(videoSlider);
+
     // splitters
     mainSplitter->setOrientation(Qt::Horizontal);
     leftSplitter->setOrientation(Qt::Vertical);
@@ -388,6 +392,10 @@ void Editor::setupWidgets(bool native)
     colorsButton->setPopupMode(QToolButton::InstantPopup);
     colorsButton->setText(tr("Colors"));
     colorsButton->setToolTip(tr("Colors"));
+
+    // test
+
+    videoSlider = new QSlider(Qt::Horizontal, this);
 }
 
 
@@ -609,6 +617,16 @@ void Editor::setupConnections()
             SIGNAL(triggered(bool)),
             layersWidget,
             SLOT(duplicateCurrentLayer(bool)));
+
+
+    connect(videoSlider,
+            SIGNAL(valueChanged(int)),
+            this,
+            SLOT(handleVideoSliderValueChanged(int)));
+    connect(videoSlider,
+            SIGNAL(sliderReleased()),
+            this,
+            SLOT(handleVideoSliderReleased()));
 }
 
 void Editor::setupIcons()

@@ -28,6 +28,8 @@
 #include <QTimer>
 #include <QGridLayout>
 
+#include "CyanFFmpeg.h"
+
 View::View(QWidget* parent,
            bool setup,
            bool native) :
@@ -44,6 +46,8 @@ View::View(QWidget* parent,
   //, _vRuler(nullptr)
   , _showGuides(true)
   , _mode(View::IteractiveMoveMode)
+  , _frameRange(0,0)
+  , _frameCurrent(0)
 {
     // setup the basics
     setAcceptDrops(true);
@@ -104,6 +108,11 @@ View::View(QWidget* parent,
             SIGNAL(resetZoom()),
             this,
             SLOT(resetImageZoom()));
+
+    connect(this,
+            SIGNAL(newCanvasBackgroundImage(Magick::Image)),
+            this,
+            SLOT(handleNewCanvasBackground(Magick::Image)));
 
     // setup canvas if needed
     if (setup) { setupCanvas(); }
@@ -1205,6 +1214,72 @@ void View::setRedo()
     setUndo(false);
 }
 
+void View::setCanvasBackgroundImage(Magick::Image image)
+{
+    try {
+        image.magick("BMP");
+        Magick::Blob pix;
+        image.write(&pix);
+        if (pix.length()>0) {
+            _rect->setBrush(QBrush(QImage::fromData(reinterpret_cast<uchar*>(const_cast<void*>(pix.data())),
+                                                    static_cast<int>(pix.length()))));
+        }
+    }
+    catch(Magick::Error &error_ ) { emit errorMessage(error_.what()); }
+    catch(Magick::Warning &warn_ ) { emit warningMessage(warn_.what()); }
+
+    //refreshTiles();
+}
+
+void View::setVideo(QString &filename, int frameStart, int frameEnd)
+{
+    if (filename.isEmpty() || frameStart < 0 || frameEnd < 1 || frameStart == frameEnd) {
+        return;
+    }
+    qDebug() << "set video specs" << filename << frameStart << frameEnd;
+    _video = filename;
+    _frameRange.first = frameStart;
+    _frameRange.second = frameEnd;
+    _frameCurrent = frameStart;
+}
+
+QString View::getVideoFilename()
+{
+    return _video;
+}
+
+void View::setVideoFilename(QString &filename)
+{
+    _video = filename;
+}
+
+QPair<int, int> View::getVideoFrameRange()
+{
+    return _frameRange;
+}
+
+void View::setVideoFrameRange(QPair<int, int> range)
+{
+    _frameRange = range;
+}
+
+int View::getVideoCurrentFrame()
+{
+    return _frameCurrent;
+}
+
+void View::setVideoCurrentFrame(int frame, bool force)
+{
+    if (_frameCurrent == frame && !force) { return; }
+    _frameCurrent = frame;
+    if (force) {
+        QtConcurrent::run(this, &View::getCanvasBackgroundFrame, _video, frame);
+    } else {
+        if (vfuture.isRunning()) { return; }
+        vfuture = QtConcurrent::run(this, &View::getCanvasBackgroundFrame, _video, frame);
+    }
+}
+
 // TODO
 void View::setCanvasSpecsFromImage(Magick::Image image)
 {
@@ -1776,6 +1851,17 @@ void View::addUndo(int id, QSize pos, bool usePos)
     //item.opacity = layer.opacity;
     item.composite = layer.composite;
     _history.addUndo(item);
+}
+
+void View::handleNewCanvasBackground(Magick::Image image)
+{
+    setCanvasBackgroundImage(image);
+}
+
+void View::getCanvasBackgroundFrame(QString &filename, int frame)
+{
+    qDebug() << "get canvas background frame" << filename << frame;
+    emit newCanvasBackgroundImage(CyanFFmpeg::getVideoFrame(filename, frame));
 }
 
 void View::setLockLayers(bool lock)

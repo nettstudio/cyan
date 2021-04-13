@@ -18,7 +18,13 @@
 #include "CyanFFmpeg.h"
 #include <QDebug>
 
-#ifdef WITH_FFMPEG
+extern "C" {
+#include <libavutil/avutil.h>
+#include <libavutil/imgutils.h>
+#include <libavdevice/avdevice.h>
+#include <libswscale/swscale.h>
+}
+
 QByteArray CyanFFmpeg::getEmbeddedCoverArt(const QString &filename)
 {
     QByteArray result;
@@ -258,4 +264,3 @@ Magick::Image CyanFFmpeg::getVideoFrame(const QString &filename,
 
     return result;
 }
-#endif

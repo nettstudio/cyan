@@ -26,7 +26,7 @@ set(COMPANY "FxArena")
 set(COPYRIGHT "Copyright Ole-Andre Rodlie. All rights reserved.")
 set(IDENTIFIER "net.fxarena.cyan")
 set(MAGICK_PKG_CONFIG "Magick++" CACHE STRING "ImageMagick pkg-config name")
-set(PROJECT_EDITION "Development Release" CACHE STRING "Edition")
+set(PROJECT_EDITION "NettStudio Edition" CACHE STRING "Edition")
 option(PLUGINS_SUPPORT "Experimental plug-ins support" OFF)
 option(DEBUG_TILES "Show tiles for debug purpose" OFF)
 option(RUNTIME_WARNINGS "Show warnings during runtime" OFF)
@@ -68,12 +68,14 @@ set(SOURCES_LIB
     lib/CyanLayerWidget.cpp
     lib/CyanLayerTree.cpp
     lib/CyanLayerTreeItem.cpp
+    lib/CyanFFmpeg.cpp
+    lib/CyanFFmpegOpenDialog.cpp
     lib/CyanNewMediaDialog.cpp
     lib/CyanGuideItem.cpp
     lib/CyanBatchWidget.cpp
     lib/CyanHistory.cpp
     lib/qtcolorpicker.cpp
-    #lib/qtcolortriangle.cpp
+    lib/qtcolortriangle.cpp
     lib/qtwindowlistmenu.cpp
 )
 set(HEADERS_LIB
@@ -92,13 +94,15 @@ set(HEADERS_LIB
     lib/CyanLayerWidget.h
     lib/CyanLayerTree.h
     lib/CyanLayerTreeItem.h
+    lib/CyanFFmpeg.h
+    lib/CyanFFmpegOpenDialog.h
     lib/CyanNewMediaDialog.h
     lib/CyanGuideItem.h
     lib/CyanBatchWidget.h
     lib/CyanHistory.h
     lib/CyanGlobal.h
     lib/qtcolorpicker.h
-    #lib/qtcolortriangle.h
+    lib/qtcolortriangle.h
     lib/qtwindowlistmenu.h
 )
 set(SOURCES_APP
@@ -130,8 +134,14 @@ if(NOT WIN32)
     pkg_search_module(MAGICK REQUIRED ${MAGICK_PKG_CONFIG}>=7.0.10)
     pkg_search_module(LCMS2 REQUIRED lcms2)
     #pkg_search_module(FONTCONF REQUIRED fontconfig)
+    pkg_search_module(AVUTIL REQUIRED libavutil)
+    pkg_search_module(AVDEVICE REQUIRED libavdevice)
+    pkg_search_module(SWSCALE REQUIRED libswscale)
+    pkg_search_module(AVFORMAT REQUIRED libavformat)
+    pkg_search_module(AVCODEC REQUIRED libavcodec)
 endif()
 
+add_definitions(-DWITH_FFMPEG -D__STDC_CONSTANT_MACROS)
 #if (APPLE)
 #    set(FC_FONTS_DIR "<dir>/System/Library/Fonts</dir><dir>/Library/Fonts</dir><dir>~/Library/Fonts</dir>")
 #    set(FC_CACHE_DIR "<cachedir>~/.cache/fontconfig</cachedir>")
@@ -300,8 +310,8 @@ if(WIN32)
 else()
     target_compile_options(${CYAN_APP_BIN} PRIVATE ${MAGICK_CFLAGS})
     target_compile_options(${CYAN_LIB_BIN} PRIVATE ${MAGICK_CFLAGS})
-    target_link_libraries(${CYAN_APP_BIN} ${MAGICK_LIBRARIES} ${LCMS2_LIBRARIES} ${MAGICK_LDFLAGS} ${LCMS2_LDFLAGS})
-    target_link_libraries(${CYAN_LIB_BIN} ${MAGICK_LIBRARIES} ${LCMS2_LIBRARIES} ${MAGICK_LDFLAGS} ${LCMS2_LDFLAGS})
+    target_link_libraries(${CYAN_APP_BIN} ${MAGICK_LIBRARIES} ${LCMS2_LIBRARIES} ${MAGICK_LDFLAGS} ${LCMS2_LDFLAGS} ${AVUTIL_LIBRARIES} ${AVDEVICE_LIBRARIES} ${SWSCALE_LIBRARIES} ${AVFORMAT_LIBRARIES} ${AVCODEC_LIBRARIES})
+    target_link_libraries(${CYAN_LIB_BIN} ${MAGICK_LIBRARIES} ${LCMS2_LIBRARIES} ${MAGICK_LDFLAGS} ${LCMS2_LDFLAGS} ${AVUTIL_LIBRARIES} ${AVDEVICE_LIBRARIES} ${SWSCALE_LIBRARIES} ${AVFORMAT_LIBRARIES} ${AVCODEC_LIBRARIES})
 endif()
 
 if(UNIX AND NOT APPLE)
@@ -399,11 +409,11 @@ if(UNIX AND NOT APPLE)
     )
 endif()
 
-#if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/plugins/CyanColorTriangle)
-#    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/plugins/CyanColorTriangle)
-#endif()
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/plugins/CyanColorTriangle)
+    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/plugins/CyanColorTriangle)
+endif()
 
-#if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/plugins/CyanTextEditor)
-#    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/plugins/CyanTextEditor)
-#endif()
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/plugins/CyanTextEditor)
+    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/plugins/CyanTextEditor)
+endif()
 

@@ -35,9 +35,7 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 
-#ifdef WITH_FFMPEG
 #include "CyanFFmpeg.h"
-#endif
 
 videoDialog::videoDialog(QWidget *parent,
                          int max,
@@ -172,7 +170,6 @@ void videoDialog::handleSlider(int pos)
         _spin->setValue(pos);
         _spin->blockSignals(false);
     }
-#ifdef WITH_FFMPEG
     try {
         Magick::Image image = CyanFFmpeg::getVideoFrame(_filename,
                                                     pos);
@@ -190,7 +187,6 @@ void videoDialog::handleSlider(int pos)
     catch(Magick::Warning &warn_ ) {
         qDebug() << warn_.what();
     }
-#endif
 }
 
 void videoDialog::handleSpin(int pos)
